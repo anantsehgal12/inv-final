@@ -26,7 +26,11 @@ export default function Dashboard() {
     .reduce((sum, invoice) => sum + invoice.total, 0);
 
   const pendingAmount = invoices
-    .filter(invoice => invoice.status === 'sent' || invoice.status === 'overdue')
+    .filter(invoice => (invoice.status === 'sent' || invoice.status === 'overdue') && invoice.type !== 'proforma')
+    .reduce((sum, invoice) => sum + invoice.total, 0);
+
+  const proformaTotal = invoices
+    .filter(invoice => invoice.type === 'proforma')
     .reduce((sum, invoice) => sum + invoice.total, 0);
 
   const overdueInvoices = invoices.filter(invoice => invoice.status === 'overdue').length;
@@ -74,6 +78,13 @@ export default function Dashboard() {
       icon: Calendar,
       color: 'text-red-600 bg-red-100',
       href: '/invoices?status=overdue'
+    },
+    {
+      name: 'Proforma Total',
+      value: formatCurrency(proformaTotal),
+      icon: FileText,
+      color: 'text-amber-600 bg-amber-100',
+      href: '/invoices?type=proforma'
     },
   ];
 
