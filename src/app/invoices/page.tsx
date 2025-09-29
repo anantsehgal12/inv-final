@@ -62,12 +62,24 @@ export default function InvoicesPage() {
     }
   };
 
-  const totalAmount = filteredInvoices.reduce((sum, invoice) => sum + invoice.total, 0);
-  const paidAmount = filteredInvoices.reduce((sum, invoice) => sum + (invoice.amountPaid || 0), 0);
-  const pendingAmount = filteredInvoices.reduce((sum, invoice) => {
-    const amountPaid = invoice.amountPaid || 0;
-    return sum + (invoice.total - amountPaid);
-  }, 0);
+  const totalAmount = filteredInvoices
+    .filter(invoice => invoice.type !== 'proforma')
+    .reduce((sum, invoice) => sum + invoice.total, 0);
+
+  const paidAmount = filteredInvoices
+    .filter(invoice => invoice.type !== 'proforma')
+    .reduce((sum, invoice) => sum + (invoice.amountPaid || 0), 0);
+
+  const pendingAmount = filteredInvoices
+    .filter(invoice => invoice.type !== 'proforma')
+    .reduce((sum, invoice) => {
+      const amountPaid = invoice.amountPaid || 0;
+      return sum + (invoice.total - amountPaid);
+    }, 0);
+
+  const proformaTotal = filteredInvoices
+    .filter(invoice => invoice.type === 'proforma')
+    .reduce((sum, invoice) => sum + invoice.total, 0);
 
   return (
     <MainLayout 
@@ -127,6 +139,10 @@ export default function InvoicesPage() {
             <div className="bg-white dark:bg-gray-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800">
               <div className="text-sm font-medium text-gray-500">Pending Amount</div>
               <div className="text-2xl font-bold text-amber-600">{formatCurrency(pendingAmount)}</div>
+            </div>
+            <div className="bg-white dark:bg-gray-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800">
+              <div className="text-sm font-medium text-gray-500">Proforma Total</div>
+              <div className="text-2xl font-bold text-amber-600">{formatCurrency(proformaTotal)}</div>
             </div>
           </div>
 
