@@ -645,7 +645,7 @@ export default function CreateInvoicePage() {
                               type="number"
                               min="0"
                               step="0.01"
-                              {...register(`items.${index}.rate` as const)}
+                              {...register(`items.${index}.rate` as const, { valueAsNumber: true })}
                               placeholder={selectedProduct?.price.toString() || '0'}
                               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                             />
@@ -717,7 +717,7 @@ export default function CreateInvoicePage() {
                     type="number"
                     min="0"
                     step="0.01"
-                    {...register('discount')}
+                    {...register('discount', { valueAsNumber: true })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     placeholder="0"
                   />
