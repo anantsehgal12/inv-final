@@ -143,6 +143,8 @@ export interface ProductFormData {
 }
 
 export interface InvoiceFormData {
+  // invoice or proforma
+  type?: 'invoice' | 'proforma';
   companyId: string;
   billToName: string;
   billToGst?: string;
