@@ -630,7 +630,8 @@ export default function CreateInvoicePage() {
                               step="1"
                               {...register(`items.${index}.quantity` as const, {
                                 required: 'Quantity is required',
-                                min: 1
+                                min: 1,
+                                valueAsNumber: true
                               })}
                               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                             />
