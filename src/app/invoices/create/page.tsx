@@ -16,7 +16,7 @@ import {
   Calendar,
   MapPin
 } from 'lucide-react';
-import { InvoiceFormData, InvoiceItem } from '@/types';
+import { InvoiceFormData, InvoiceItem, InvoiceItemFormData, AdditionalCharge } from '@/types';
 import { formatCurrency, calculateInvoiceTotal } from '@/utils/calculations';
 import { format } from 'date-fns';
 import InvoicePreview from '@/components/InvoicePreview';
@@ -37,10 +37,10 @@ export default function CreateInvoicePage() {
   } = useForm<InvoiceFormData>({
     defaultValues: {
       type: 'invoice',
-      companyId: settings.general.defaultCompanyId || companies[0]?.id || '',
+      companyId: settings?.general?.defaultCompanyId || companies?.[0]?.id || '',
       invoiceNumber: '',
       invoiceDate: format(new Date(), 'yyyy-MM-dd'),
-      dueDate: format(new Date(Date.now() + settings.invoice.dueDays * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
+      dueDate: format(new Date(Date.now() + (settings?.invoice?.dueDays || 0) * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
       placeOfSupply: '',
       billToName: '',
       billToStreet: '',
@@ -51,8 +51,8 @@ export default function CreateInvoicePage() {
       items: [{ productId: '', quantity: 1 }],
       discountType: 'amount',
       discount: 0,
-      notes: settings.invoice.defaultNotes || '',
-      terms: settings.invoice.defaultTerms || '',
+      notes: settings?.invoice?.defaultNotes || '',
+      terms: settings?.invoice?.defaultTerms || '',
       additionalCharges: [],
     },
   });
@@ -67,7 +67,8 @@ export default function CreateInvoicePage() {
     name: 'additionalCharges',
   });
 
-  const watchedValues = watch();
+  // use `any` for watchedValues so we can access dynamic form fields like `type` without TS errors
+  const watchedValues = watch() as any;
   const selectedCompany = companies.find(c => c.id === watchedValues.companyId);
 
   // Auto-generate invoice number when component mounts, type changes, or company changes
@@ -86,22 +87,22 @@ export default function CreateInvoicePage() {
 
   // Update due date, notes, and terms when type changes
   useEffect(() => {
-    const type = watchedValues.type;
-    if (type && settings[type]) {
-      const typeSettings = settings[type];
-      setValue('dueDate', format(new Date(Date.now() + typeSettings.dueDays * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
-      setValue('notes', typeSettings.defaultNotes || '');
-      setValue('terms', typeSettings.defaultTerms || '');
+    const type: 'invoice' | 'proforma' = watchedValues.type || 'invoice';
+    const typeSettings = type === 'proforma' ? settings?.proforma : settings?.invoice;
+    if (type && typeSettings) {
+      setValue('dueDate', format(new Date(Date.now() + ((typeSettings as any).dueDays || 0) * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
+      setValue('notes', (typeSettings as any).defaultNotes || '');
+      setValue('terms', (typeSettings as any).defaultTerms || '');
     }
   }, [watchedValues.type, setValue, settings]);
 
   // Calculate invoice totals
   const invoiceCalculation = useMemo(() => {
-    if (!selectedCompany) return null;
+    if (!selectedCompany || !settings?.tax) return null;
 
-    const items: InvoiceItem[] = watchedValues.items
-      .filter(item => item.productId)
-      .map(item => {
+    const items: InvoiceItem[] = (watchedValues.items || [])
+      .filter((item: InvoiceItemFormData) => item.productId)
+      .map((item: InvoiceItemFormData) => {
         const product = products.find(p => p.id === item.productId);
         if (!product) return null;
 
@@ -131,10 +132,9 @@ export default function CreateInvoicePage() {
       watchedValues.discountType || 'amount',
       selectedCompany.address.state,
       watchedValues.placeOfSupply,
-      watchedValues.additionalCharges || [],
-      settings.tax.roundingMethod
+      watchedValues.additionalCharges || []
     );
-  }, [watchedValues, selectedCompany, products]);
+  }, [watchedValues, selectedCompany, products, settings]);
 
   const onSubmit = async (data: InvoiceFormData) => {
     if (!selectedCompany || !invoiceCalculation) {
@@ -191,7 +191,6 @@ export default function CreateInvoicePage() {
         discount: (typeof data.discount === 'number' && !isNaN(data.discount)) ? data.discount : 0,
         discountType: data.discountType,
         additionalCharges: (data.additionalCharges || []).filter(c => c && c.name && c.amount != null && typeof c.amount === 'number' && !isNaN(c.amount)),
-        roundOff: invoiceCalculation.roundOff,
         total: invoiceCalculation.total,
         notes: data.notes,
         terms: data.terms,
@@ -209,6 +208,21 @@ export default function CreateInvoicePage() {
     }
   };
 
+  if (!settings || !companies) {
+    return (
+      <MainLayout title="Create Invoice">
+        <div className="text-center py-12">
+          <span className="mx-auto h-12 w-12 flex items-center justify-center text-gray-400">
+            <svg className="animate-spin h-8 w-8 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+            </svg>
+          </span>
+          <h3 className="mt-2 text-sm font-medium text-white">Loading...</h3>
+        </div>
+      </MainLayout>
+    );
+  }
   if (companies.length === 0) {
     return (
       <MainLayout title="Create Invoice">
@@ -873,8 +887,8 @@ export default function CreateInvoicePage() {
                 dueDate: new Date(watchedValues.dueDate),
                 placeOfSupply: watchedValues.placeOfSupply,
                 items: watchedValues.items
-                  .filter(item => item.productId && products.find(p => p.id === item.productId))
-                  .map(item => {
+                  .filter((item: InvoiceItemFormData) => item.productId && products.find(p => p.id === item.productId))
+                  .map((item: InvoiceItemFormData) => {
                     const product = products.find(p => p.id === item.productId)!;
                     const rate = item.rate || product.price;
                     const amount = item.quantity * rate;
@@ -896,8 +910,7 @@ export default function CreateInvoicePage() {
                 totalTax: invoiceCalculation.totalTax,
                 discount: invoiceCalculation.discount,
                 discountType: watchedValues.discountType,
-                additionalCharges: (watchedValues.additionalCharges || []).filter(c => c && c.name && c.amount != null),
-                roundOff: invoiceCalculation.roundOff,
+                additionalCharges: (watchedValues.additionalCharges || []).filter((c: AdditionalCharge) => c && c.name && c.amount != null),
                 total: invoiceCalculation.total,
                 notes: watchedValues.notes,
                 terms: watchedValues.terms,
