@@ -36,6 +36,7 @@ export default function CreateInvoicePage() {
     formState: { errors },
   } = useForm<InvoiceFormData>({
     defaultValues: {
+      type: 'invoice',
       companyId: settings.general.defaultCompanyId || companies[0]?.id || '',
       invoiceNumber: '',
       invoiceDate: format(new Date(), 'yyyy-MM-dd'),
@@ -69,12 +70,12 @@ export default function CreateInvoicePage() {
   const watchedValues = watch();
   const selectedCompany = companies.find(c => c.id === watchedValues.companyId);
 
-  // Auto-generate invoice number when component mounts or company changes
+  // Auto-generate invoice number when component mounts, type changes, or company changes
   useEffect(() => {
     if (!watchedValues.invoiceNumber) {
-      setValue('invoiceNumber', getNextInvoiceNumber());
+      setValue('invoiceNumber', getNextInvoiceNumber(watchedValues.type || 'invoice'));
     }
-  }, [setValue, watchedValues.invoiceNumber]);
+  }, [setValue, watchedValues.invoiceNumber, watchedValues.type]);
 
   // Auto-populate place of supply from selected company
   useEffect(() => {
@@ -82,6 +83,17 @@ export default function CreateInvoicePage() {
       setValue('placeOfSupply', selectedCompany.address.state);
     }
   }, [selectedCompany, setValue, watchedValues.placeOfSupply]);
+
+  // Update due date, notes, and terms when type changes
+  useEffect(() => {
+    const type = watchedValues.type;
+    if (type && settings[type]) {
+      const typeSettings = settings[type];
+      setValue('dueDate', format(new Date(Date.now() + typeSettings.dueDays * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'));
+      setValue('notes', typeSettings.defaultNotes || '');
+      setValue('terms', typeSettings.defaultTerms || '');
+    }
+  }, [watchedValues.type, setValue, settings]);
 
   // Calculate invoice totals
   const invoiceCalculation = useMemo(() => {
@@ -119,7 +131,8 @@ export default function CreateInvoicePage() {
       watchedValues.discountType || 'amount',
       selectedCompany.address.state,
       watchedValues.placeOfSupply,
-      watchedValues.additionalCharges || []
+      watchedValues.additionalCharges || [],
+      settings.tax.roundingMethod
     );
   }, [watchedValues, selectedCompany, products]);
 
@@ -178,18 +191,19 @@ export default function CreateInvoicePage() {
         discount: invoiceCalculation.discount,
         discountType: data.discountType,
         additionalCharges: (data.additionalCharges || []).filter(c => c && c.name && c.amount != null),
+        roundOff: invoiceCalculation.roundOff,
         total: invoiceCalculation.total,
         notes: data.notes,
         terms: data.terms,
         status: 'sent' as const,
-        type: 'invoice' as const,
+        type: data.type!,
       };
 
-      addInvoice(invoice);
+      await addInvoice(invoice);
       router.push('/invoices');
     } catch (error) {
       console.error('Error creating invoice:', error);
-      alert('Error creating invoice. Please try again.');
+      alert(error instanceof Error ? error.message : 'Error creating invoice. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -295,6 +309,22 @@ export default function CreateInvoicePage() {
             <div className="bg-gray-800 shadow-sm rounded-lg p-6">
               <h3 className="text-lg font-medium text-white mb-4">Invoice Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-white mb-1">
+                    Type *
+                  </label>
+                  <select
+                    {...register('type', { required: 'Type is required' })}
+                    className="w-full px-3 py-2 border bg-gray-800 border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="invoice">Invoice</option>
+                    <option value="proforma">Proforma Invoice</option>
+                  </select>
+                  {errors.type && (
+                    <p className="mt-1 text-sm text-red-600">{errors.type.message}</p>
+                  )}
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-white mb-1">
                     Invoice Number *
@@ -597,10 +627,10 @@ export default function CreateInvoicePage() {
                             <input
                               type="number"
                               min="1"
-                              step="0.01"
-                              {...register(`items.${index}.quantity` as const, { 
+                              step="1"
+                              {...register(`items.${index}.quantity` as const, {
                                 required: 'Quantity is required',
-                                min: 0.01 
+                                min: 1
                               })}
                               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                             />
@@ -866,11 +896,12 @@ export default function CreateInvoicePage() {
                 discount: invoiceCalculation.discount,
                 discountType: watchedValues.discountType,
                 additionalCharges: (watchedValues.additionalCharges || []).filter(c => c && c.name && c.amount != null),
+                roundOff: invoiceCalculation.roundOff,
                 total: invoiceCalculation.total,
                 notes: watchedValues.notes,
                 terms: watchedValues.terms,
                 status: 'draft',
-                type: 'invoice',
+                type: watchedValues.type!,
                 amountPaid: 0,
                 createdAt: new Date(),
                 updatedAt: new Date(),
