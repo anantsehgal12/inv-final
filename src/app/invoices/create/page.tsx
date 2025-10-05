@@ -149,7 +149,7 @@ export default function CreateInvoicePage() {
         .filter(item => item.productId && products.find(p => p.id === item.productId))
         .map(item => {
           const product = products.find(p => p.id === item.productId)!;
-          const rate = item.rate || product.price;
+          const rate = (typeof item.rate === 'number' && !isNaN(item.rate)) ? item.rate : product.price;
           const amount = item.quantity * rate;
           return {
             productId: product.id,
@@ -188,9 +188,9 @@ export default function CreateInvoicePage() {
         items,
         subtotal: invoiceCalculation.subtotal,
         totalTax: invoiceCalculation.totalTax,
-        discount: invoiceCalculation.discount,
+        discount: (typeof data.discount === 'number' && !isNaN(data.discount)) ? data.discount : 0,
         discountType: data.discountType,
-        additionalCharges: (data.additionalCharges || []).filter(c => c && c.name && c.amount != null),
+        additionalCharges: (data.additionalCharges || []).filter(c => c && c.name && c.amount != null && typeof c.amount === 'number' && !isNaN(c.amount)),
         roundOff: invoiceCalculation.roundOff,
         total: invoiceCalculation.total,
         notes: data.notes,
